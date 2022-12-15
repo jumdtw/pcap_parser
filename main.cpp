@@ -1,4 +1,4 @@
-#include<pcap.h>
+#include<pcap/pcap.h>
 #include<iostream>
 
 int main(int argc, char *argv[]){
@@ -14,7 +14,7 @@ int main(int argc, char *argv[]){
     }
 
     //create dumper
-    pcap_t *save_pcap = pcap_create(NULL, pcap_errbuf);
+    pcap_t *save_pcap = pcap_create("any", pcap_errbuf);
     if((pcap_activate(save_pcap))!=0){
         fprintf(stderr, "pcap_t create: error %s\n", pcap_geterr(save_pcap));
         exit(EXIT_FAILURE);
@@ -26,9 +26,16 @@ int main(int argc, char *argv[]){
     }
 
 
+    //get pcap file header
+    std::cout << "read pcapfile header : 0x" << std::hex << pcap_datalink(pcap) << "\n";
+    std::cout << "gen pcapfile header : 0x" << std::hex << pcap_datalink(save_pcap) << "\n";
+
+
     struct pcap_pkthdr pkthdr;
     while ((pkt = pcap_next(pcap, &pkthdr))) {
-        std::cout << pkthdr.len << "\n";
+        //std::cout << pkthdr.len << "\n";
+        //pkthdr.ts.tv_sec=0;
+        //pkthdr.ts.tv_usec=0;
         pcap_dump((u_char *)dumper, &pkthdr, pkt);
     }
 
