@@ -19,7 +19,7 @@ $(OBJS): $(SRCS)
 	$(CC) $(CFLAGS) -c $(SRCS)
 
 test:
-	./a.out /home/user/buf/test.pcap
+	./a.out /home/user/buf/read_test.pcap /home/user/buf/gen_test.pcap /home/user/buf/gen_test_change_header.pcap
 
 # (11)"make all"で make cleanとmakeを同時に実施。
 all: clean $(OBJS) $(TARGET)
