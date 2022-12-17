@@ -86,36 +86,105 @@ void change_linktype_header(const char *read_pcap_path, const char *save_pcap_pa
 sll_v2_t *my_create_sll_v2(const u_char *pkt){
     sll_v2_t *sll_v2 = new sll_v2_t;
     int shift = 0;
-    sll_v2->protocol =  *((unsigned int *)pkt);shift+=sizeof(int);
-    sll_v2->interface_index = *((unsigned int *)(pkt+shift));shift+=sizeof(int);
-    sll_v2->link_layer_addr_type = *((unsigned short *)(pkt+shift));shift+=sizeof(short);
+    // a = 0x ab cd ef gh
+    unsigned int a = *((unsigned int *)pkt);
+    unsigned int b = 0;
+    // b = 0x gh 00 00 00
+    b = ((a << 8*3)&0xFF000000);
+    // b = 0x gh ef 00 00
+    b |= ((a << 8*1)&0x00FF0000);
+    // b = 0x gh ef cd 00
+    b |= ((a >> 8*1)&0x0000FF00);
+    // b = 0x gh ef cd ab
+    b |= ((a >> 8*3)&0x000000FF);
+    sll_v2->protocol =  b;shift+=sizeof(int);
+
+    a = *((unsigned int *)(pkt+shift));
+    b = 0;
+    b = ((a << 8*3)&0xFF000000);
+    b |= ((a << 8*1)&0x00FF0000);
+    b |= ((a >> 8*1)&0x0000FF00);
+    b |= ((a >> 8*3)&0x000000FF);
+    sll_v2->interface_index = b;shift+=sizeof(int);
+
+    // a = 0x ab cd
+    unsigned short c = *((unsigned short *)(pkt+shift));
+    unsigned short d = 0;
+    // d = 0x cd 00
+    d = c << 8*1;
+    // d = 0x cd ab
+    d |= ((c >> 8*1)&0x00FF);
+    sll_v2->link_layer_addr_type = c;shift+=sizeof(short);
+
     sll_v2->packet_type = *((unsigned char*)(pkt+shift));shift+=sizeof(char);
     sll_v2->link_layer_addr_len = *((unsigned char *)(pkt+shift));shift+=sizeof(char);
-    sll_v2->source = *((unsigned long *)(pkt+shift));
-    sll_v2->unused = 0;
+
+    // e = 0x ab cd ef gh ij kn ml op
+    unsigned long e = *((unsigned long *)(pkt+shift));
+    unsigned long f = 0;
+    // f = 0x op 00 00 00 00 00 00 00
+    f = ((e << 8*7)&0xFF00000000000000);
+    // f = 0x op ml 00 00 00 00 00 00
+    f |= ((e << 8*5)&0x00FF000000000000);
+    // f = 0x op ml kn 00 00 00 00 00
+    f |= ((e << 8*3)&0x0000FF0000000000);
+    // f = 0x op ml kn ij 00 00 00 00
+    f |= ((e << 8*1)&0x000000FF00000000);
+    // f = 0x op ml kn ij gh 00 00 00
+    f |= ((e >> 8*1)&0x00000000FF000000);
+    // f = 0x op ml kn ij gh ef 00 00
+    f |= ((e >> 8*3)&0x0000000000FF0000);
+    // f = 0x op ml kn ij gh ef cd 00
+    f |= ((e >> 8*5)&0x000000000000FF00);
+    // f = 0x op ml kn ij gh ef cd ab
+    f |= ((e >> 8*7)&0x00000000000000FF);
+    sll_v2->source = e;
     return sll_v2;
 }
 
 sll_v1_t *my_create_sll_v1(sll_v2_t *sll_v2){
     sll_v1_t *sll_v1 = new sll_v1_t;
-    sll_v1->packet_type = sll_v2->packet_type;
+    //print_v2_header((u_char *)sll_v2);
+    sll_v1->packet_type = (unsigned short)sll_v2->packet_type;
     sll_v1->link_layer_addr_type = sll_v2->link_layer_addr_type;
-    sll_v1->link_layer_addr_len = sll_v2->link_layer_addr_len;
+    sll_v1->link_layer_addr_len = (unsigned short)sll_v2->link_layer_addr_len;
     sll_v1->source = sll_v2->source;
-    sll_v1->unused = 0;
-    sll_v1->protocol =  sll_v2->protocol;
+    sll_v1->protocol =  (unsigned short)(sll_v2->protocol>>8*2);
     return sll_v1;
 }
 
-void my_write_sll_v1_header(sll_v1_t *sll_v1, u_char *v1_header){
-    int shift = 0;
-    strncpy(v1_header, sll_v1, sizeof(u_short));
+void my_edian_disp_to_raw(u_char *dst, sll_v1_t *sll_v1){
+
 }
 
+void my_write_raw_data(u_char *dst, u_char *src, int len){
+    for(int i=0;i<len;i++){
+        dst[i] = src[i];
+    }
+}
+
+void print_v2_header(u_char *pkt_sll_v2_header){
+    sll_v2_t *sll_v2 = (sll_v2_t *)pkt_sll_v2_header;
+    std::cout << "pkt_sll_v2_header protocol : 0x" << std::hex << sll_v2->protocol << "\n";
+    std::cout << "pkt_sll_v2_header interface_index : 0x" << std::hex << sll_v2->interface_index << "\n";
+    std::cout << "pkt_sll_v2_header link_layer_addr_type : 0x" << std::hex << sll_v2->link_layer_addr_type << "\n";
+    std::cout << "pkt_sll_v2_header packet_type : 0x" << std::hex << (int)sll_v2->packet_type << "\n";    
+    std::cout << "pkt_sll_v2_header link_layer_addr_len : 0x" << std::hex << (int)sll_v2->link_layer_addr_len << "\n";
+    std::cout << "pkt_sll_v2_header source : 0x" << std::hex << sll_v2->source << "\n";    
+}
+
+void print_v1_header(u_char *pkt_sll_v1_header){
+    sll_v1_t *sll_v1 = (sll_v1_t *)pkt_sll_v1_header;
+    std::cout << "pkt_sll_v1_header packet_type : 0x" << std::hex << sll_v1->packet_type << "\n"; 
+    std::cout << "pkt_sll_v1_header link_layer_addr_type : 0x" << std::hex << sll_v1->link_layer_addr_type << "\n"; 
+    std::cout << "pkt_sll_v1_header link_layer_addr_len : 0x" << std::hex << sll_v1->link_layer_addr_len << "\n"; 
+    std::cout << "pkt_sll_v1_header source : 0x" << std::hex << sll_v1->source << "\n"; 
+    std::cout << "pkt_sll_v1_header protocol : 0x" << std::hex << sll_v1->protocol << "\n"; 
+}
 
 int main(int argc, char *argv[]){
     const u_char *pkt;
-
+    u_char *buf;
     u_char *pkt_writen;
     u_char *pkt_sll_v1_header;
 
@@ -124,34 +193,36 @@ int main(int argc, char *argv[]){
 
     //create dumper
     pcap_dumper_t *dumper = my_create_pcap_dumper(argv[2]);
-
-    struct pcap_pkthdr pkthdr;
     bool f = true;
+    struct pcap_pkthdr pkthdr;
     while ((pkt = pcap_next(pcap, &pkthdr))) {
         if(f){
             pkt_writen = new u_char[(pkthdr.len)-SLL_V2_LEN+SLL_V1_LEN];
             pkt_sll_v1_header = new u_char[SLL_V1_LEN];
             sll_v2_t *sll_v2 = my_create_sll_v2(pkt);
+            print_v2_header((u_char*)sll_v2);
             sll_v1_t *sll_v1 = my_create_sll_v1(sll_v2);
+            std::cout << "create v1------" << "\n";
+            print_v1_header((u_char*)sll_v1);
 
-            //strncpy(pkt_writen, pkt_sll_v1_header,SLL_V1_LEN);
-            //strncpy(pkt_writen+SLL_V1_LEN, pkt+SLL_V2_LEN, (pkthdr.len)-SLL_V2_LEN+SLL_V1_LEN);
+
+            // display num to little edian
+            my_edian_disp_to_raw(pkt_sll_v1_header, sll_v1);
+            //std::cout << "write------" << "\n";
+            //print_v1_header(pkt_sll_v1_header);
+            // pkt_sll_v1_header to pkt_writen
+            my_write_raw_data(pkt_writen, pkt_sll_v1_header, SLL_V1_LEN);
+            //std::cout << "writen------" << "\n";
+            //print_v1_header(pkt_writen);
+            // pkt+SLL_V2_LEN to pkt_writen+SLL_V1_HEADER
+            my_write_raw_data(pkt_writen+SLL_V1_LEN, (u_char *)pkt+SLL_V2_LEN, (pkthdr.len)-SLL_V2_LEN);
+
+
+            pkthdr.len = pkthdr.len-SLL_V2_LEN+SLL_V1_LEN;
+            pkthdr.caplen = pkthdr.len;
             f = false;
-            //std::cout << "protocol : 0x" << std::hex << sll_v2->protocol << "\n";
-            //std::cout << "interface_index : 0x" << std::hex << sll_v2->interface_index << "\n";
-            //std::cout << "link_layer_addr_type : 0x" << std::hex << sll_v2->link_layer_addr_type << "\n";
-            //std::cout << "packet_type : 0x" << std::hex << (int)sll_v2->packet_type << "\n";
-            //std::cout << "link_layer_addr_len : 0x" << std::hex << (int)sll_v2->link_layer_addr_len << "\n";
-            //std::cout << "source :: " << std::hex << sll_v2->source << "\n";
-            //std::cout << "unused : 0x" << std::hex << sll_v2->unused << "\n";
-            std::cout << "packet_type : 0x" << std::hex << sll_v1->packet_type << "\n";
-            std::cout << "link_layer_addr_type : 0x" << std::hex << sll_v1->link_layer_addr_type << "\n";
-            std::cout << "link_layer_addr_len : 0x" << std::hex << sll_v1->link_layer_addr_len << "\n";
-            std::cout << "source : 0x" << std::hex << sll_v1->source << "\n";
-            std::cout << "unused : 0x" << std::hex << sll_v1->unused << "\n";
-            std::cout << "protocol : 0x" << std::hex << sll_v1->protocol << "\n";
-        }   
-        pcap_dump((u_char *)dumper, &pkthdr, pkt);
+        }
+        pcap_dump((u_char *)dumper, &pkthdr, pkt_writen);
     }
     pcap_dump_flush(dumper);
     pcap_dump_close(dumper);
@@ -159,7 +230,7 @@ int main(int argc, char *argv[]){
     
 
     // change pcap header link type
-    change_linktype_header(argv[2], argv[3], 0x0114);
+    change_linktype_header(argv[2], argv[3], 0x071);
 
     return 0;
 
