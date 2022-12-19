@@ -119,25 +119,25 @@ sll_v2_t *my_create_sll_v2(const u_char *pkt){
     sll_v2->packet_type = *((unsigned char*)(pkt+shift));shift+=sizeof(char);
     sll_v2->link_layer_addr_len = *((unsigned char *)(pkt+shift));shift+=sizeof(char);
 
-    // e = 0x ab cd ef gh ij kn ml op
+    // e = 0x ab cd ef gh ij kn ml zz : zz is unused 
     unsigned long e = *((unsigned long *)(pkt+shift));
     unsigned long f = 0;
-    // f = 0x op 00 00 00 00 00 00 00
-    f = ((e << 8*7)&0xFF00000000000000);
-    // f = 0x op ml 00 00 00 00 00 00
-    f |= ((e << 8*5)&0x00FF000000000000);
-    // f = 0x op ml kn 00 00 00 00 00
-    f |= ((e << 8*3)&0x0000FF0000000000);
-    // f = 0x op ml kn ij 00 00 00 00
-    f |= ((e << 8*1)&0x000000FF00000000);
-    // f = 0x op ml kn ij gh 00 00 00
-    f |= ((e >> 8*1)&0x00000000FF000000);
-    // f = 0x op ml kn ij gh ef 00 00
-    f |= ((e >> 8*3)&0x0000000000FF0000);
-    // f = 0x op ml kn ij gh ef cd 00
-    f |= ((e >> 8*5)&0x000000000000FF00);
-    // f = 0x op ml kn ij gh ef cd ab
-    f |= ((e >> 8*7)&0x00000000000000FF);
+    // f = 0x ml 00 00 00 00 00 00 00
+    f = ((e << 8*6)&0xFF00000000000000);
+    // f = 0x ml kn 00 00 00 00 00 00
+    f |= ((e << 8*4)&0x00FF000000000000);
+    // f = 0x ml kn ij 00 00 00 00 00
+    f |= ((e << 8*2)&0x0000FF0000000000);
+    // f = 0x ml kn ij gh 00 00 00 00
+    f |= ((e)&0x000000FF00000000);
+    // f = 0x ml kn ij gh ef 00 00 00
+    f |= ((e >> 8*2)&0x00000000FF000000);
+    // f = 0x ml kn ij gh ef cd 00 00
+    f |= ((e >> 8*4)&0x0000000000FF0000);
+    // f = 0x ml kn ij gh ef cd ab 00
+    f |= ((e >> 8*6)&0x000000000000FF00);
+    // f = 0x ml kn ij gh ef cd ab zz
+    f &= (0xFFFFFFFFFFFFFF00);
     sll_v2->source = e;
     return sll_v2;
 }
@@ -154,7 +154,60 @@ sll_v1_t *my_create_sll_v1(sll_v2_t *sll_v2){
 }
 
 void my_edian_disp_to_raw(u_char *dst, sll_v1_t *sll_v1){
+    int shift = 0;
+    unsigned short a = 0;
+    // packet_type
+    // a = 0x ab cd
+    // a = 0x cd 00
+    a = (sll_v1->packet_type) << 8*1;
+    // a = 0x cd ab
+    a |= (((sll_v1->packet_type) >> 8*1)&0x00FF);
+    my_write_raw_data(dst, (u_char *)(&a), sizeof(u_short));shift+=sizeof(u_short);a = 0;
+    
+    // link_layer_addr_type
+    a = (sll_v1->link_layer_addr_type) << 8*1;
+    a |= (((sll_v1->link_layer_addr_type) >> 8*1)&0x00FF);
+    my_write_raw_data(dst+shift, (u_char *)(&a), sizeof(u_short));shift+=sizeof(u_short);a = 0;
+    
+    // link_layer_addr_len
+    a = (sll_v1->link_layer_addr_len) << 8*1;
+    a |= (((sll_v1->link_layer_addr_len) >> 8*1)&0x00FF);
+    my_write_raw_data(dst+shift, (u_char *)(&a), sizeof(u_short));shift+=sizeof(u_short);a = 0;
+    /*
+    // source
+    // e = 0x zz zz ef gh ij kn ml op : zz is unused
+    unsigned long f = 0;
+    // f = 0x op 00 00 00 00 00 00 00
+    f = ((sll_v1->source << 8*7)&0xFF00000000000000);
 
+    // f = 0x op ml 00 00 00 00 00 00
+    f |= ((sll_v1->source << 8*5)&0x00FF000000000000);
+
+    // f = 0x op ml kn 00 00 00 00 00
+    f |= ((sll_v1->source << 8*3)&0x0000FF0000000000);
+
+    // f = 0x op ml kn ij 00 00 00 00
+    f |= ((sll_v1->source << 8*1)&0x000000FF00000000);
+
+    // f = 0x op ml kn ij gh 00 00 00
+    f |= ((sll_v1->source >> 8*1)&0x00000000FF000000);
+
+    // f = 0x op ml kn ij gh ef 00 00
+    f |= ((sll_v1->source >> 8*3)&0x0000000000FF0000);
+
+    // f = 0x op ml kn ij gh ef zz 00
+    f &= (0xFFFFFFFFFFFF00FF);
+
+    // f = 0x op ml kn ij gh ef zz zz
+    f &= (0xFFFFFFFFFFFFFF00);
+    std::cout << "source f: 0x" << std::hex << f << "\n";
+    my_write_raw_data(dst+shift, (u_char *)(&f), sizeof(u_long));std::cout << "source dst: 0x" << std::hex << *((u_long *)(dst+shift)) << "\n";shift+=sizeof(u_long);
+    */
+    my_write_raw_data(dst+shift, (u_char *)(&sll_v1->source), sizeof(u_long));shift+=sizeof(u_long);
+    // protocol
+    a = (sll_v1->protocol) << 8*1;
+    a |= (((sll_v1->protocol) >> 8*1)&0x00FF);
+    my_write_raw_data(dst+shift, (u_char *)(&a), sizeof(u_short));
 }
 
 void my_write_raw_data(u_char *dst, u_char *src, int len){
@@ -193,36 +246,26 @@ int main(int argc, char *argv[]){
 
     //create dumper
     pcap_dumper_t *dumper = my_create_pcap_dumper(argv[2]);
-    bool f = true;
     struct pcap_pkthdr pkthdr;
     while ((pkt = pcap_next(pcap, &pkthdr))) {
-        if(f){
-            pkt_writen = new u_char[(pkthdr.len)-SLL_V2_LEN+SLL_V1_LEN];
-            pkt_sll_v1_header = new u_char[SLL_V1_LEN];
-            sll_v2_t *sll_v2 = my_create_sll_v2(pkt);
-            print_v2_header((u_char*)sll_v2);
-            sll_v1_t *sll_v1 = my_create_sll_v1(sll_v2);
-            std::cout << "create v1------" << "\n";
-            print_v1_header((u_char*)sll_v1);
+        pkt_writen = new u_char[(pkthdr.len)-SLL_V2_LEN+SLL_V1_LEN];
+        pkt_sll_v1_header = new u_char[SLL_V1_LEN];
+        sll_v2_t *sll_v2 = my_create_sll_v2(pkt);
+        sll_v1_t *sll_v1 = my_create_sll_v1(sll_v2);
 
+        // display num to little edian
+        my_edian_disp_to_raw(pkt_sll_v1_header, sll_v1);
+        // pkt_sll_v1_header to pkt_writen
+        my_write_raw_data(pkt_writen, pkt_sll_v1_header, SLL_V1_LEN);
+        //std::cout << "writen------" << "\n";
+        //print_v1_header(pkt_writen);
+        // pkt+SLL_V2_LEN to pkt_writen+SLL_V1_HEADER
+        my_write_raw_data(pkt_writen+SLL_V1_LEN, (u_char *)pkt+SLL_V2_LEN, (pkthdr.len)-SLL_V2_LEN);
 
-            // display num to little edian
-            my_edian_disp_to_raw(pkt_sll_v1_header, sll_v1);
-            //std::cout << "write------" << "\n";
-            //print_v1_header(pkt_sll_v1_header);
-            // pkt_sll_v1_header to pkt_writen
-            my_write_raw_data(pkt_writen, pkt_sll_v1_header, SLL_V1_LEN);
-            //std::cout << "writen------" << "\n";
-            //print_v1_header(pkt_writen);
-            // pkt+SLL_V2_LEN to pkt_writen+SLL_V1_HEADER
-            my_write_raw_data(pkt_writen+SLL_V1_LEN, (u_char *)pkt+SLL_V2_LEN, (pkthdr.len)-SLL_V2_LEN);
-
-
-            pkthdr.len = pkthdr.len-SLL_V2_LEN+SLL_V1_LEN;
-            pkthdr.caplen = pkthdr.len;
-            f = false;
-        }
+        pkthdr.len = pkthdr.len-SLL_V2_LEN+SLL_V1_LEN;
+        pkthdr.caplen = pkthdr.len;
         pcap_dump((u_char *)dumper, &pkthdr, pkt_writen);
+        delete pkt_writen;
     }
     pcap_dump_flush(dumper);
     pcap_dump_close(dumper);

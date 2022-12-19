@@ -11,6 +11,9 @@ pcap_t *my_pcap_read(const char *read_pcap_path);
 pcap_dumper_t *my_create_pcap_dumper(const char *save_pcap_path);
 void change_linktype_header(const char *read_pcap_path, const char *save_pcap_path, unsigned int write_linktype);
 sll_v2_t *my_create_sll_v2(u_char *pkt);
+void print_v2_header(u_char *pkt_sll_v2_header);
+void print_v1_header(u_char *pkt_sll_v1_header);
+void my_write_raw_data(u_char *dst, u_char *src, int len);
 
 struct sll_v1{
     unsigned short packet_type;
@@ -18,7 +21,7 @@ struct sll_v1{
     unsigned short link_layer_addr_len;
     // not right len : normal six bytes
     unsigned long source;
-    unsigned short unused;
+    //unsigned short unused;
     unsigned short protocol;
 };
 
@@ -30,7 +33,7 @@ struct sll_v2{
     unsigned char link_layer_addr_len;
     // not right len : normal six bytes
     unsigned long source;
-    unsigned short unused;
+    //unsigned short unused;
 };
 
 
