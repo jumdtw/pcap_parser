@@ -22,7 +22,7 @@ pcap_t *my_pcap_read(const char *read_pcap_path){
         fprintf(stderr, "pcap_open: error %s\n", pcap_errbuf);
         exit(EXIT_FAILURE);
     }
-    if(check_link_type(pcap)){exit(EXIT_FAILURE);};
+    //if(check_link_type(pcap)){exit(EXIT_FAILURE);};
     return pcap;
 }
 
@@ -247,33 +247,35 @@ int main(int argc, char *argv[]){
     //create dumper
     pcap_dumper_t *dumper = my_create_pcap_dumper(argv[2]);
     struct pcap_pkthdr pkthdr;
-    while ((pkt = pcap_next(pcap, &pkthdr))) {
-        pkt_writen = new u_char[(pkthdr.len)-SLL_V2_LEN+SLL_V1_LEN];
-        pkt_sll_v1_header = new u_char[SLL_V1_LEN];
-        sll_v2_t *sll_v2 = my_create_sll_v2(pkt);
-        sll_v1_t *sll_v1 = my_create_sll_v1(sll_v2);
+    if(pcap_datalink(pcap)==0x114){
+        while ((pkt = pcap_next(pcap, &pkthdr))) {
+            pkt_writen = new u_char[(pkthdr.len)-SLL_V2_LEN+SLL_V1_LEN];
+            pkt_sll_v1_header = new u_char[SLL_V1_LEN];
+            sll_v2_t *sll_v2 = my_create_sll_v2(pkt);
+            sll_v1_t *sll_v1 = my_create_sll_v1(sll_v2);
 
-        // display num to little edian
-        my_edian_disp_to_raw(pkt_sll_v1_header, sll_v1);
-        // pkt_sll_v1_header to pkt_writen
-        my_write_raw_data(pkt_writen, pkt_sll_v1_header, SLL_V1_LEN);
-        //std::cout << "writen------" << "\n";
-        //print_v1_header(pkt_writen);
-        // pkt+SLL_V2_LEN to pkt_writen+SLL_V1_HEADER
-        my_write_raw_data(pkt_writen+SLL_V1_LEN, (u_char *)pkt+SLL_V2_LEN, (pkthdr.len)-SLL_V2_LEN);
+            // display num to little edian
+            my_edian_disp_to_raw(pkt_sll_v1_header, sll_v1);
+            // pkt_sll_v1_header to pkt_writen
+            my_write_raw_data(pkt_writen, pkt_sll_v1_header, SLL_V1_LEN);
+            // pkt+SLL_V2_LEN to pkt_writen+SLL_V1_HEADER
+            my_write_raw_data(pkt_writen+SLL_V1_LEN, (u_char *)pkt+SLL_V2_LEN, (pkthdr.len)-SLL_V2_LEN);
 
-        pkthdr.len = pkthdr.len-SLL_V2_LEN+SLL_V1_LEN;
-        pkthdr.caplen = pkthdr.len;
-        pcap_dump((u_char *)dumper, &pkthdr, pkt_writen);
-        delete pkt_writen;
+            pkthdr.len = pkthdr.len-SLL_V2_LEN+SLL_V1_LEN;
+            pkthdr.caplen = pkthdr.len;
+            pcap_dump((u_char *)dumper, &pkthdr, pkt_writen);
+            delete pkt_writen;
+        }
+        pcap_dump_flush(dumper);
+
+        // change pcap header link type
+        change_linktype_header(argv[2], argv[3], 0x071);
+    }else{
+        change_linktype_header(argv[1], argv[3], 0x071);
     }
-    pcap_dump_flush(dumper);
+    
     pcap_dump_close(dumper);
     pcap_close(pcap);
-    
-
-    // change pcap header link type
-    change_linktype_header(argv[2], argv[3], 0x071);
 
     return 0;
 
